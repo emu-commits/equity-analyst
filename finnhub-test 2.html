@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finnhub Test</title>
+<style>
+  body { font-family: monospace; background: #0a0a0f; color: #e8e6e0; padding: 32px; max-width: 500px; margin: 0 auto; }
+  h2 { color: #c9a84c; margin-bottom: 24px; }
+  label { display: block; font-size: 11px; color: #6b6975; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+  input { width: 100%; background: #111118; border: 1px solid #2a2a35; color: #e8e6e0; font-family: monospace; font-size: 14px; padding: 10px 12px; border-radius: 2px; outline: none; margin-bottom: 16px; box-sizing: border-box; }
+  input:focus { border-color: #c9a84c; }
+  button { background: #c9a84c; color: #0a0a0f; border: none; font-family: monospace; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; padding: 11px 24px; border-radius: 2px; cursor: pointer; width: 100%; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  #result { margin-top: 24px; padding: 16px; border: 1px solid #2a2a35; border-radius: 2px; background: #111118; min-height: 80px; font-size: 13px; line-height: 1.8; display: none; }
+  #result.show { display: block; }
+  .ok  { color: #4caf7d; }
+  .err { color: #e05c5c; }
+  .dim { color: #6b6975; }
+  .price { font-size: 28px; color: #c9a84c; margin: 8px 0; }
+</style>
+</head>
+<body>
+
+<h2>Finnhub Live Price Test</h2>
+
+<label>Your Finnhub API Key</label>
+<input id="apiKey" type="text" placeholder="Paste your key here" autocorrect="off" autocapitalize="none" spellcheck="false"/>
+
+<label>Ticker Symbol</label>
+<input id="ticker" type="text" placeholder="AAPL" value="AAPL" autocorrect="off" autocapitalize="characters" spellcheck="false"/>
+
+<button id="btn" onclick="testFetch()">Fetch Live Price</button>
+
+<div id="result"></div>
+
+<script>
+async function testFetch() {
+  const key    = document.getElementById('apiKey').value.trim();
+  const ticker = document.getElementById('ticker').value.trim().toUpperCase();
+  const result = document.getElementById('result');
+  const btn    = document.getElementById('btn');
+
+  if (!key)    { show('err', 'Please enter your Finnhub API key.'); return; }
+  if (!ticker) { show('err', 'Please enter a ticker symbol.'); return; }
+
+  btn.disabled = true;
+
+  const url = 'https://finnhub.io/api/v1/quote?symbol=' + ticker + '&token=' + key;
+
+  const lines = [];
+  function log(msg, type) {
+    lines.push({ msg, type });
+    result.className = 'show';
+    result.innerHTML = lines.map(l =>
+      '<div class="' + (l.type||'dim') + '">' + l.msg + '</div>'
+    ).join('');
+  }
+
+  log('Step 1: Button clicked ✓');
+  log('Step 2: Key length = ' + key.length + ', Ticker = ' + ticker);
+  log('Step 3: URL = ' + url.replace(key, key.substring(0,4)+'****'));
+  log('Step 4: Calling fetch()...');
+
+  try {
+    let res;
+    try {
+      res = await fetch(url);
+      log('Step 5: fetch() returned, HTTP status = ' + res.status, res.ok ? 'ok' : 'err');
+    } catch(fetchErr) {
+      log('Step 5: fetch() threw an exception!', 'err');
+      log('Error name: ' + fetchErr.name, 'err');
+      log('Error message: ' + fetchErr.message, 'err');
+      log('---', 'dim');
+      log('Diagnosis: Network request was blocked or failed before reaching the server.', 'err');
+      log('Possible causes:', 'dim');
+      log('  • File opened from Files app (file:// protocol) — try moving to iCloud and opening via Safari share sheet', 'dim');
+      log('  • iOS content blocker or VPN blocking the request', 'dim');
+      log('  • No internet connection', 'dim');
+      log('  • Safari cross-origin policy blocking file:// → https://', 'dim');
+      return;
+    }
+
+    let text;
+    try {
+      text = await res.text();
+      log('Step 6: Response body received, length = ' + text.length + ' chars', 'ok');
+      log('Raw response: ' + text.substring(0, 200), 'dim');
+    } catch(textErr) {
+      log('Step 6: Failed to read response body: ' + textErr.message, 'err');
+      return;
+    }
+
+    let data;
+    try {
+      data = JSON.parse(text);
+      log('Step 7: JSON parsed OK', 'ok');
+    } catch(jsonErr) {
+      log('Step 7: JSON parse failed: ' + jsonErr.message, 'err');
+      log('Raw text was: ' + text.substring(0, 300), 'dim');
+      return;
+    }
+
+    if (data.error) {
+      log('Step 8: API returned error: ' + data.error, 'err');
+      return;
+    }
+
+    if (data.c === 0 && data.t === 0) {
+      log('Step 8: API returned zeros — invalid ticker or key', 'err');
+      log('Full response: ' + JSON.stringify(data), 'dim');
+      return;
+    }
+
+    // Success
+    const pct   = data.dp != null ? (data.dp >= 0 ? '+' : '') + data.dp.toFixed(2) + '%' : '—';
+    const color = data.d >= 0 ? '#4caf7d' : '#e05c5c';
+    const ts    = data.t ? new Date(data.t * 1000).toLocaleTimeString() : '—';
+
+    result.innerHTML =
+      '<div class="ok">✓ SUCCESS — Live data received!</div>' +
+      '<div class="price">$' + data.c.toFixed(2) + '</div>' +
+      '<div><span class="dim">Change: </span><span style="color:' + color + '">' +
+        (data.d >= 0 ? '+' : '') + data.d.toFixed(2) + ' (' + pct + ')</span></div>' +
+      '<div><span class="dim">Open: </span>$' + data.o.toFixed(2) +
+        '&nbsp;&nbsp;<span class="dim">High: </span>$' + data.h.toFixed(2) +
+        '&nbsp;&nbsp;<span class="dim">Low: </span>$' + data.l.toFixed(2) + '</div>' +
+      '<div><span class="dim">Prev Close: </span>$' + data.pc.toFixed(2) + '</div>' +
+      '<div><span class="dim">Timestamp: </span>' + ts + '</div>' +
+      '<div style="margin-top:14px;color:#4caf7d;font-size:11px;border-top:1px solid #2a2a35;padding-top:10px;">' +
+        '✓ CONCEPT VALIDATED — Outbound fetch works. Ready to build the full app.</div>';
+    result.className = 'show';
+
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function show(type, msg) {
+  const result = document.getElementById('result');
+  result.className = 'show';
+  result.innerHTML = '<span class="' + type + '">' + msg.replace(/\n/g, '<br>') + '</span>';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') testFetch();
+});
+</script>
+</body>
+</html>
