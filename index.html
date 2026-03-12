@@ -589,7 +589,7 @@ function renderCard(container,r){
   const comp=r.composite||'—';
   const verd=comp!=='—'?verdictFor(comp):null;
   const currency=(r.call1?.reportingCurrency||'USD').toUpperCase();
-  const rsi=ai.rsi??ta.rsi, rsiCls=rsi?(rsi<30?'pos':rsi>70?'neg':'amb'):'';
+  const rsi=(ai.rsi??ta.rsi), rsiCls=rsi?(rsi<30?'pos':rsi>70?'neg':'amb'):'';
   const revG=Array.isArray(gs.revenueGrowth5yr)?gs.revenueGrowth5yr:[];
 
   card.className='stock-card';
@@ -676,8 +676,8 @@ function renderCard(container,r){
     '</div>'+
     // Support/Resistance (computed from real candles)
     '<div class="mgrid" style="margin-bottom:9px">'+
-      '<div class="metric"><div class="mlabel">Support <span style="font-size:8px;color:var(--amber)">● web</span></div><div class="mval pos">'+fmtUSD(ai.support1??ta.support1)+' / '+fmtUSD(ai.support2??ta.support2)+'</div></div>'+
-      '<div class="metric"><div class="mlabel">Resistance <span style="font-size:8px;color:var(--amber)">● web</span></div><div class="mval neg">'+fmtUSD(ai.resistance1??ta.resistance1)+' / '+fmtUSD(ai.resistance2??ta.resistance2)+'</div></div>'+
+      '<div class="metric"><div class="mlabel">Support <span style="font-size:8px;color:var(--amber)">● web</span></div><div class="mval pos">'+fmtUSD((ai.support1??ta.support1))+' / '+fmtUSD((ai.support2??ta.support2))+'</div></div>'+
+      '<div class="metric"><div class="mlabel">Resistance <span style="font-size:8px;color:var(--amber)">● web</span></div><div class="mval neg">'+fmtUSD((ai.resistance1??ta.resistance1))+' / '+fmtUSD((ai.resistance2??ta.resistance2))+'</div></div>'+
     '</div>'+
     // MAs (real)
     '<div class="mgrid-3" style="margin-bottom:9px">'+
@@ -694,8 +694,8 @@ function renderCard(container,r){
     '</div>'+
     // Bollinger
     '<div class="bar-wrap">'+
-      '<div class="bar-label"><span>Bollinger Band Position <span style="color:var(--amber)">● web</span></span><span>'+(ai.bollingerBand??ta.bbPosition||'—')+'</span></div>'+
-      '<div class="bar-track"><div class="bar-fill" style="width:'+(( ai.bbPct??ta.bbPct)!=null?Math.max(0,Math.min(100,(ai.bbPct??ta.bbPct)*100)):50)+'%;background:'+((ai.bbPct??ta.bbPct||0)>0.8?'var(--red)':(ai.bbPct??ta.bbPct||0)<0.2?'var(--green)':'var(--gold)')+'"></div></div>'+
+      '<div class="bar-label"><span>Bollinger Band Position <span style="color:var(--amber)">● web</span></span><span>'+((ai.bollingerBand??ta.bbPosition)||'—')+'</span></div>'+
+      '<div class="bar-track"><div class="bar-fill" style="width:'+(( (ai.bbPct??ta.bbPct))!=null?Math.max(0,Math.min(100,((ai.bbPct??ta.bbPct))*100)):50)+'%;background:'+(((ai.bbPct??ta.bbPct)||0)>0.8?'var(--red)':((ai.bbPct??ta.bbPct)||0)<0.2?'var(--green)':'var(--gold)')+'"></div></div>'+
     '</div>'+
     // Fibonacci (computed)
     '<div class="mgrid-3" style="margin:9px 0">'+
@@ -869,7 +869,6 @@ async function _runAnalysis(){
   if(ok>0) pdfBtn.disabled=false;
 }
 
-} // end _runAnalysis
 
 function setStatus(msg,loading){
   document.getElementById('statusBar').innerHTML=loading
@@ -1014,10 +1013,10 @@ async function exportPDF(){
       ['Weekly',trendIcon(ta.trendWeekly)+' '+(ta.trendWeekly||'—')],
       ['Monthly',trendIcon(ta.trendMonthly)+' '+(ta.trendMonthly||'—')],
       ['MA50',fmtUSD(ta.ma50)],['MA100',fmtUSD(ta.ma100)],['MA200',fmtUSD(ta.ma200)],
-      ['RSI(14)',(ai.rsi??ta.rsi)?(ai.rsi??ta.rsi)+' ('+(ai.rsiInterpretation??'')+')'  :'—'],
-      ['MACD',(ai.macd??ta.macd||'—')],['Volume',(ai.volumeTrend??ta.volumeTrend||'—')],
-      ['Support',fmtUSD(ai.support1??ta.support1)+'/'+fmtUSD(ai.support2??ta.support2)],
-      ['Resistance',fmtUSD(ai.resistance1??ta.resistance1)+'/'+fmtUSD(ai.resistance2??ta.resistance2)],
+      ['RSI(14)',((ai.rsi??ta.rsi))?((ai.rsi??ta.rsi))+' ('+((ai.rsiInterpretation??''))+')'  :'—'],
+      ['MACD',((ai.macd??ta.macd)||'—')],['Volume',((ai.volumeTrend??ta.volumeTrend)||'—')],
+      ['Support',fmtUSD((ai.support1??ta.support1))+'/'+fmtUSD((ai.support2??ta.support2))],
+      ['Resistance',fmtUSD((ai.resistance1??ta.resistance1))+'/'+fmtUSD((ai.resistance2??ta.resistance2))],
       ['MA Signal',maSignalText(ta.maSignal)],
       ['Fib 23.6%',fmtUSD(ta.fib236)],['Fib 38.2%',fmtUSD(ta.fib382)],['Fib 61.8%',fmtUSD(ta.fib618)],
       ['Entry',fmtUSD(ai.taEntryPrice),[45,122,79]],
