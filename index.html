@@ -154,7 +154,7 @@ body{background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans',sans-s
   </div>
 
   <div class="controls">
-    <button class="btn btn-run" id="runBtn" onclick="runAnalysis()">Run Analysis</button>
+    <button class="btn btn-run" id="runBtn" onclick="runAnalysis()" disabled>Run Analysis</button>
     <button class="btn btn-pdf" id="pdfBtn" onclick="exportPDF()" disabled>Export PDF</button>
   </div>
 
@@ -199,19 +199,45 @@ body{background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans',sans-s
 // FX RATES
 // ══════════════════════════════════════════════════════════════════════════════
 let fxRates={}, fxDate='';
+let fxLoaded=false;
+
+async function fetchFXOnce(){
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),8000);
+  const r=await fetch('https://api.frankfurter.dev/v1/latest?base=USD',{signal:controller.signal});
+  clearTimeout(timeout);
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const d=await r.json();
+  fxRates['USD']=1.0;
+  for(const [c,v] of Object.entries(d.rates)) fxRates[c]=1/v;
+  fxDate=d.date;
+}
+
 async function loadFXRates(){
   const bar=document.getElementById('fxBar');
-  try{
-    const r=await fetch('https://api.frankfurter.dev/v1/latest?base=USD');
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    const d=await r.json();
-    fxRates['USD']=1.0;
-    for(const [c,v] of Object.entries(d.rates)) fxRates[c]=1/v;
-    fxDate=d.date;
-    bar.innerHTML='<span class="ok">✓ FX loaded</span> · '+Object.keys(fxRates).length+' currencies · ECB · '+fxDate;
-  }catch(e){
-    bar.innerHTML='<span class="err">⚠ FX unavailable — USD assumed</span>';
-    fxRates['USD']=1.0;
+  const runBtn=document.getElementById('runBtn');
+  let attempt=0;
+  const delays=[0,3000,6000,10000,15000]; // retry schedule
+  while(true){
+    try{
+      bar.innerHTML=attempt===0
+        ?'Fetching live exchange rates…'
+        :'<span class="warn">⚠ FX retry '+(attempt)+'/'+( delays.length-1)+'…</span>';
+      await fetchFXOnce();
+      fxLoaded=true;
+      runBtn.disabled=false;
+      bar.innerHTML='<span class="ok">✓ FX loaded</span> · '+Object.keys(fxRates).length+' currencies · ECB · '+fxDate;
+      return;
+    }catch(e){
+      attempt++;
+      console.warn('FX attempt '+attempt+' failed:',e.message);
+      if(attempt>=delays.length){
+        // All retries exhausted — show manual retry button
+        bar.innerHTML='<span class="err">⚠ FX failed after '+( attempt)+' attempts — <button onclick="loadFXRates()" style="font-family:IBM Plex Mono,monospace;font-size:10px;background:none;border:1px solid var(--gold);color:var(--gold);cursor:pointer;padding:2px 8px;margin-left:4px">Retry</button></span>';
+        return;
+      }
+      await new Promise(r=>setTimeout(r,delays[attempt]));
+    }
   }
 }
 function toUSD(n,c){
@@ -714,8 +740,12 @@ function renderCard(container,r){
 let allResults=[];
 
 async function runAnalysis(){
+  try { _runAnalysis(); } catch(e) { setStatus('Error: '+e.message); console.error(e); }
+}
+async function _runAnalysis(){
   const fhKey=document.getElementById('finnhubKey').value.trim();
   const orKey=document.getElementById('openrouterKey').value.trim();
+  if(!fxLoaded){setStatus('⚠ Waiting for exchange rates to load — please wait.');return;}
   if(!fhKey){setStatus('Please enter your Finnhub API key.');return;}
   if(!orKey){setStatus('Please enter your OpenRouter API key.');return;}
 
@@ -805,6 +835,8 @@ async function runAnalysis(){
   runBtn.disabled=false;
   if(ok>0) pdfBtn.disabled=false;
 }
+
+} // end _runAnalysis
 
 function setStatus(msg,loading){
   document.getElementById('statusBar').innerHTML=loading
@@ -1019,7 +1051,16 @@ async function exportPDF(){
 }
 
 document.getElementById('tickerInput').addEventListener('keydown',e=>{if(e.key==='Enter')runAnalysis();});
+
+// Load FX on startup — Run button enabled only after success
 loadFXRates();
+
+// Surface any unhandled JS errors visibly
+window.addEventListener('error',e=>{
+  const bar=document.getElementById('statusBar');
+  if(bar) bar.innerHTML='<span class="err">⚠ JS Error: '+e.message+' ('+e.filename?.split('/').pop()+':'+e.lineno+')</span>';
+  console.error('Unhandled error:',e);
+});
 </script>
 </body>
 </html>
