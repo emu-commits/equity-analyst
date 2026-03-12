@@ -373,9 +373,9 @@ tr:hover td { background: rgba(154,123,47,.04); }
         autocorrect="off" autocapitalize="none" spellcheck="false"/>
     </div>
     <div class="field">
-      <div class="field-label">Anthropic API Key — DCF Fundamentals</div>
+      <div class="field-label">OpenRouter API Key — DCF Fundamentals</div>
       <input class="field-input" id="anthropicKey" type="password"
-        placeholder="Paste Anthropic key here (sk-ant-...)"
+        placeholder="Paste OpenRouter key here (sk-or-...)"
         autocorrect="off" autocapitalize="none" spellcheck="false"/>
     </div>
   </div>
@@ -480,11 +480,16 @@ async function fetchFundamentals(ticker, anthropicKey) {
     '}\n\n' +
     'If ticker is unknown return: {"error":"Unknown ticker ' + ticker + '"}';
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + anthropicKey,
+      'HTTP-Referer': 'https://equity-analyst.github.io',
+      'X-Title': 'Equity Analyst'
+    },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'anthropic/claude-sonnet-4',
       max_tokens: 600,
       messages: [{ role: 'user', content: prompt }]
     })
@@ -492,11 +497,12 @@ async function fetchFundamentals(ticker, anthropicKey) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error('Claude API: ' + (err.error?.message || 'HTTP ' + res.status));
+    throw new Error('OpenRouter: ' + (err.error?.message || 'HTTP ' + res.status));
   }
 
   const data = await res.json();
-  const text = data.content.map(b => b.text || '').join('').trim()
+  // OpenRouter uses OpenAI-style response: choices[0].message.content
+  const text = (data.choices?.[0]?.message?.content || '').trim()
     .replace(/^```json\s*/i,'').replace(/^```/,'').replace(/```\s*$/,'').trim();
 
   const parsed = JSON.parse(text);
@@ -621,7 +627,7 @@ async function runAnalysis() {
   const anthropicKey = document.getElementById('anthropicKey').value.trim();
 
   if (!finnhubKey)   { setStatus('Please enter your Finnhub API key.'); return; }
-  if (!anthropicKey) { setStatus('Please enter your Anthropic API key.'); return; }
+  if (!anthropicKey) { setStatus('Please enter your OpenRouter API key.'); return; }
 
   const raw = document.getElementById('tickerInput').value;
   const seen = {}, tickers = [];
