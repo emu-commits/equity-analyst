@@ -311,12 +311,13 @@ async function fetchAllFinnhub(ticker, key){
 function computeTA(metrics, currentPrice){
   const m = metrics?.metric || {};
 
+  // Only use fields Finnhub actually returns on free tier
   const high52 = m['52WeekHigh'] || null;
   const low52  = m['52WeekLow']  || null;
-  const ma50   = m['50DayMA']    || null;
-  const ma200  = m['200DayMA']   || null;
+  // Note: 50DayMA / 200DayMA do NOT exist in Finnhub free basic financials
+  // MA50/MA200 will be estimated by Claude in call2
 
-  // Fibonacci from 52-week range (computed locally)
+  // Fibonacci from 52-week range (computed locally — only thing we can do without candles)
   let fib236=null,fib382=null,fib500=null,fib618=null;
   if(high52&&low52){
     const r=high52-low52;
@@ -326,27 +327,21 @@ function computeTA(metrics, currentPrice){
     fib618=Math.round((high52-r*0.618)*100)/100;
   }
 
-  // Trend from Finnhub MAs (computed locally)
-  const trendDaily  = ma50  ? (currentPrice>ma50 ?'bullish':'bearish') : 'neutral';
-  const trendMonthly= ma200 ? (currentPrice>ma200?'bullish':'bearish') : 'neutral';
-  const trendWeekly = (ma50&&ma200) ? (ma50>ma200?'bullish':'bearish') : 'neutral';
-
-  // MA signal
-  let maSignal='neutral';
-  if(ma50&&ma200){
-    if(currentPrice>ma50&&currentPrice>ma200) maSignal='above_all';
-    else if(currentPrice<ma50&&currentPrice<ma200) maSignal='below_all';
-  }
+  // Rough trend from 52wk range position
+  const midRange = (high52&&low52) ? (high52+low52)/2 : null;
+  const trendDaily   = midRange ? (currentPrice>midRange?'bullish':'bearish') : 'neutral';
+  const trendWeekly  = trendDaily;
+  const trendMonthly = trendDaily;
 
   return {
-    ma50,ma100:null,ma200,maSignal,
-    high52,low52,
-    fib236,fib382,fib500,fib618,
-    trendDaily,trendWeekly,trendMonthly,
-    // RSI/MACD/BB/volume/S&R sourced by Claude web search
-    rsi:null,macd:null,bbPosition:null,bbPct:null,
-    bbUpper:null,bbLower:null,volumeTrend:null,
-    support1:null,support2:null,resistance1:null,resistance2:null,
+    ma50:null, ma100:null, ma200:null, maSignal:null,
+    high52, low52,
+    fib236, fib382, fib500, fib618,
+    trendDaily, trendWeekly, trendMonthly,
+    // All TA indicators estimated by Claude in call2
+    rsi:null, macd:null, bbPosition:null, bbPct:null,
+    bbUpper:null, bbLower:null, volumeTrend:null,
+    support1:null, support2:null, resistance1:null, resistance2:null,
     fromFinnhub:true
   };
 }
@@ -418,7 +413,9 @@ async function callClaudeWebSearch(prompt, key, maxTokens=1400){
 async function fetchCall1(ticker,livePrice,fhMetrics,key){
   // Extract what we have from Finnhub to reduce AI guesswork
   const m=fhMetrics?.metric||{};
-  const knownData=`Known live data from Finnhub:
+  const knownData=`IMPORTANT: You are analysing ticker symbol "${ticker}" ONLY. Do not return data for any other company.
+
+Known live data from Finnhub for ${ticker}:
 - Current price: $${livePrice.toFixed(2)} USD
 - P/E TTM: ${m['peBasicExclExtraTTM']??m['peTTM']??'unknown'}
 - EPS TTM: ${m['epsTTM']??'unknown'}
@@ -431,22 +428,22 @@ async function fetchCall1(ticker,livePrice,fhMetrics,key){
 - Revenue growth 1yr: ${m['revenueGrowthTTMYoy']??'unknown'}`;
 
   const prompt=
-`You are a senior Wall Street analyst. Using the live data below plus your training knowledge, return ONE raw JSON only — no markdown, no commentary:
+`You are a senior Wall Street analyst analysing ${ticker} ONLY. Using the live data below plus your training knowledge, return ONE raw JSON only — no markdown, no commentary:
 
 ${knownData}
 
-Return JSON:
+Return JSON for ${ticker}:
 
 {
   "companyName": "Full legal name",
   "reportingCurrency": "ISO 4217 e.g. USD TWD CAD",
-  "avgFCF": <avg annual FCF last 3yrs in reporting currency — search for this>,
+  "avgFCF": <avg annual FCF last 3yrs as ACTUAL DOLLAR AMOUNT (not millions) in reporting currency e.g. 5000000000 for $5B>,
   "revenueGrowthRate": <3yr avg annual revenue growth decimal>,
   "beta": <use Finnhub value if available, else search>,
-  "totalDebt": <long-term debt in reporting currency>,
-  "cash": <cash & equivalents in reporting currency>,
-  "sharesOutstanding": <shares as integer>,
-  "marketCap": <market cap in reporting currency>,
+  "totalDebt": <long-term debt as ACTUAL DOLLAR AMOUNT (not millions) in reporting currency>,
+  "cash": <cash & equivalents as ACTUAL DOLLAR AMOUNT (not millions) in reporting currency>,
+  "sharesOutstanding": <shares as ACTUAL INTEGER e.g. 1400000000 for 1.4 billion shares, NOT in millions>,
+  "marketCap": <market cap as ACTUAL DOLLAR AMOUNT (not millions) in reporting currency>,
   "dcfNotes": "Key DCF assumption or risk",
   "peRatio": <P/E — use Finnhub if available>,
   "sectorAvgPE": <sector avg P/E — search for current>,
@@ -481,7 +478,7 @@ Return JSON:
 // ══════════════════════════════════════════════════════════════════════════════
 async function fetchCall2(ticker,companyName,livePrice,ta,fhMetrics,insiderMSPR,key){
   const prompt=
-`You are both a Citadel quant trader AND a Renaissance Technologies researcher.
+`You are both a Citadel quant trader AND a Renaissance Technologies researcher. Analyse ticker ${ticker} ONLY.
 
 LIVE DATA for ${ticker} (${companyName||ticker}) at $${livePrice.toFixed(2)} from Finnhub:
 - MA50: ${ta.ma50?.toFixed(2)??'N/A'} | MA200: ${ta.ma200?.toFixed(2)??'N/A'} | Signal: ${ta.maSignal}
@@ -674,9 +671,9 @@ function renderCard(container,r){
     '</div>'+
     // Trend
     '<div class="mgrid-3" style="margin-bottom:9px">'+
-      '<div class="metric"><div class="mlabel">Daily</div><div class="mval '+trendCls(ta.trendDaily)+'">'+trendIcon(ta.trendDaily)+' '+(ta.trendDaily||'—')+'</div></div>'+
-      '<div class="metric"><div class="mlabel">Weekly</div><div class="mval '+trendCls(ta.trendWeekly)+'">'+trendIcon(ta.trendWeekly)+' '+(ta.trendWeekly||'—')+'</div></div>'+
-      '<div class="metric"><div class="mlabel">Monthly</div><div class="mval '+trendCls(ta.trendMonthly)+'">'+trendIcon(ta.trendMonthly)+' '+(ta.trendMonthly||'—')+'</div></div>'+
+      '<div class="metric"><div class="mlabel">Daily</div><div class="mval '+trendCls(ta.trendDaily)+'">'+(ta.trendDaily==='bullish'?'^':ta.trendDaily==='bearish'?'v':'-')+' '+(ta.trendDaily||'—')+'</div></div>'+
+      '<div class="metric"><div class="mlabel">Weekly</div><div class="mval '+trendCls(ta.trendWeekly)+'">'+(ta.trendWeekly==='bullish'?'^':ta.trendWeekly==='bearish'?'v':'-')+' '+(ta.trendWeekly||'—')+'</div></div>'+
+      '<div class="metric"><div class="mlabel">Monthly</div><div class="mval '+trendCls(ta.trendMonthly)+'">'+(ta.trendMonthly==='bullish'?'^':ta.trendMonthly==='bearish'?'v':'-')+' '+(ta.trendMonthly||'—')+'</div></div>'+
     '</div>'+
     // Support/Resistance (computed from real candles)
     '<div class="mgrid" style="margin-bottom:9px">'+
@@ -1013,9 +1010,9 @@ async function exportPDF(){
     if(ai.taGrade){const[a,b,c]=gc(ai.taGrade);doc.setTextColor(a,b,c);doc.text('Grade: '+ai.taGrade,W-m-24,y+3);}
     y+=7;
     y+=row3([
-      ['Daily',trendIcon(ta.trendDaily)+' '+(ta.trendDaily||'—')],
-      ['Weekly',trendIcon(ta.trendWeekly)+' '+(ta.trendWeekly||'—')],
-      ['Monthly',trendIcon(ta.trendMonthly)+' '+(ta.trendMonthly||'—')],
+      ['Daily',(ta.trendDaily==='bullish'?'^':ta.trendDaily==='bearish'?'v':'-')+' '+(ta.trendDaily||'—')],
+      ['Weekly',(ta.trendWeekly==='bullish'?'^':ta.trendWeekly==='bearish'?'v':'-')+' '+(ta.trendWeekly||'—')],
+      ['Monthly',(ta.trendMonthly==='bullish'?'^':ta.trendMonthly==='bearish'?'v':'-')+' '+(ta.trendMonthly||'—')],
       ['MA50',fmtUSD(ta.ma50)],['MA100',fmtUSD(ta.ma100)],['MA200',fmtUSD(ta.ma200)],
       ['RSI(14)',((ai.rsi??ta.rsi))?((ai.rsi??ta.rsi))+' ('+((ai.rsiInterpretation??''))+')'  :'—'],
       ['MACD',((ai.macd??ta.macd)||'—')],['Volume',((ai.volumeTrend??ta.volumeTrend)||'—')],
@@ -1079,7 +1076,7 @@ async function exportPDF(){
   // FOOTER
   doc.setDrawColor(26,26,36);doc.setLineWidth(0.4);doc.line(m,H-14,W-m,H-14);
   doc.setFont('helvetica','normal');doc.setFontSize(5.5);doc.setTextColor(138,135,153);
-  doc.text('🟢 Finnhub: live price, financials (MA50/200, 52wk, P/E, beta, D/E), insider MSPR  🔵 Computed: Fibonacci + trend from Finnhub MAs  🟡 AI+web: RSI/MACD/BB/S&R/patterns/insider/institutional via Claude web search. FX: open.er-api.com/ECB. Not investment advice.',m,H-8,{maxWidth:cW});
+  doc.text('[LIVE] Finnhub: price, financials (52wk, P/E, beta, D/E), insider MSPR  [CALC] Fibonacci from 52wk range  [AI] RSI/MACD/BB/S&R/patterns via Claude. FX: open.er-api.com. Not investment advice.',m,H-8,{maxWidth:cW});
   doc.setLineWidth(0.8);doc.line(m,H-4,W-m,H-4);
 
   doc.save('equity-analysis-'+new Date().toISOString().slice(0,10)+'.pdf');
