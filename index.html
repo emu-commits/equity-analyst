@@ -3,147 +3,807 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Finnhub Test</title>
+<title>Equity Analyst</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-  body { font-family: monospace; background: #0a0a0f; color: #e8e6e0; padding: 32px; max-width: 500px; margin: 0 auto; }
-  h2 { color: #c9a84c; margin-bottom: 24px; }
-  label { display: block; font-size: 11px; color: #6b6975; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
-  input { width: 100%; background: #111118; border: 1px solid #2a2a35; color: #e8e6e0; font-family: monospace; font-size: 14px; padding: 10px 12px; border-radius: 2px; outline: none; margin-bottom: 16px; box-sizing: border-box; }
-  input:focus { border-color: #c9a84c; }
-  button { background: #c9a84c; color: #0a0a0f; border: none; font-family: monospace; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; padding: 11px 24px; border-radius: 2px; cursor: pointer; width: 100%; }
-  button:disabled { opacity: 0.4; cursor: not-allowed; }
-  #result { margin-top: 24px; padding: 16px; border: 1px solid #2a2a35; border-radius: 2px; background: #111118; min-height: 80px; font-size: 13px; line-height: 1.8; display: none; }
-  #result.show { display: block; }
-  .ok  { color: #4caf7d; }
-  .err { color: #e05c5c; }
-  .dim { color: #6b6975; }
-  .price { font-size: 28px; color: #c9a84c; margin: 8px 0; }
+/* ── RESET & BASE ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ink:    #1a1a24;
+  --paper:  #f5f2eb;
+  --cream:  #ede9df;
+  --line:   #d4cfc4;
+  --gold:   #9a7b2f;
+  --gold2:  #c9a84c;
+  --rust:   #b85c38;
+  --slate:  #4a4a5a;
+  --muted:  #8a8799;
+  --green:  #2d7a4f;
+  --red:    #b83232;
+  --amber:  #9a6b0f;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 14px;
+  min-height: 100vh;
+}
+
+/* ── MASTHEAD ─────────────────────────────────────────────────────────────── */
+.masthead {
+  border-bottom: 3px double var(--ink);
+  padding: 28px 48px 20px;
+  text-align: center;
+  background: var(--paper);
+  position: relative;
+}
+.masthead::after {
+  content: '';
+  position: absolute;
+  bottom: -7px; left: 0; right: 0;
+  height: 1px;
+  background: var(--ink);
+}
+.masthead-rule {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.masthead h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(32px, 6vw, 56px);
+  font-weight: 700;
+  letter-spacing: -1px;
+  color: var(--ink);
+  line-height: 1;
+}
+.masthead-sub {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-top: 8px;
+}
+
+/* ── LAYOUT ───────────────────────────────────────────────────────────────── */
+.page { max-width: 1100px; margin: 0 auto; padding: 40px 32px; }
+
+/* ── KEYS SECTION ─────────────────────────────────────────────────────────── */
+.keys-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+@media (max-width: 600px) { .keys-grid { grid-template-columns: 1fr; } }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.field-input {
+  background: white;
+  border: 1px solid var(--line);
+  border-bottom: 2px solid var(--ink);
+  color: var(--ink);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  padding: 10px 12px;
+  outline: none;
+  transition: border-color .15s;
+  border-radius: 0;
+  width: 100%;
+}
+.field-input:focus { border-color: var(--gold); border-bottom-color: var(--gold); }
+.field-input::placeholder { color: var(--muted); font-size: 11px; }
+
+/* ── TICKER INPUT ─────────────────────────────────────────────────────────── */
+.ticker-section { margin-bottom: 28px; }
+.ticker-input {
+  width: 100%;
+  background: white;
+  border: 1px solid var(--line);
+  border-bottom: 2px solid var(--ink);
+  color: var(--ink);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 16px;
+  padding: 14px 16px;
+  outline: none;
+  transition: border-color .15s;
+  letter-spacing: 1px;
+}
+.ticker-input:focus { border-bottom-color: var(--gold); }
+.ticker-input::placeholder { color: var(--muted); font-size: 12px; letter-spacing: 0; }
+.field-hint {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+/* ── DIVIDER ──────────────────────────────────────────────────────────────── */
+.divider {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 28px 0;
+  position: relative;
+}
+.divider-label {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--paper);
+  padding: 0 12px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ── CONTROLS ─────────────────────────────────────────────────────────────── */
+.controls { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 12px 28px;
+  border: none;
+  cursor: pointer;
+  transition: all .15s;
+}
+.btn-run {
+  background: var(--ink);
+  color: var(--paper);
+}
+.btn-run:hover { background: #2d2d3a; }
+.btn-run:disabled { opacity: .4; cursor: not-allowed; }
+.btn-pdf {
+  background: transparent;
+  color: var(--gold);
+  border: 1px solid var(--gold);
+}
+.btn-pdf:hover { background: rgba(154,123,47,.08); }
+.btn-pdf:disabled { opacity: .3; cursor: not-allowed; }
+
+/* ── STRATEGIES BAR ───────────────────────────────────────────────────────── */
+.strat-bar {
+  display: flex; gap: 8px; margin: 24px 0 20px;
+  flex-wrap: wrap; align-items: center;
+}
+.strat-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--muted);
+  margin-right: 4px;
+}
+.stag {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px; letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: white;
+}
+.stag.on {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgba(154,123,47,.06);
+}
+
+/* ── STATUS ───────────────────────────────────────────────────────────────── */
+.status-bar {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px; color: var(--muted);
+  min-height: 28px; display: flex;
+  align-items: center; gap: 8px;
+  padding: 4px 0;
+}
+.dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--gold); flex-shrink: 0;
+  animation: pulse 1s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+/* ── PROGRESS ─────────────────────────────────────────────────────────────── */
+.prog { height: 2px; background: var(--line); margin: 8px 0 24px; }
+.prog-fill { height: 100%; background: var(--gold); transition: width .3s; width: 0%; }
+
+/* ── RESULTS ──────────────────────────────────────────────────────────────── */
+.results { opacity: 0; transform: translateY(8px); transition: all .4s; }
+.results.on { opacity: 1; transform: translateY(0); }
+.results-hdr {
+  display: flex; justify-content: space-between;
+  align-items: baseline; margin-bottom: 16px;
+  border-bottom: 2px solid var(--ink); padding-bottom: 10px;
+}
+.results-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 22px; font-style: italic;
+}
+.results-meta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; color: var(--muted);
+}
+
+/* ── TABLE ────────────────────────────────────────────────────────────────── */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+thead { border-bottom: 2px solid var(--ink); }
+th {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8.5px; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--muted);
+  padding: 10px 12px; text-align: left;
+  white-space: nowrap; background: var(--cream);
+}
+th.c { text-align: center; }
+td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle; white-space: nowrap;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(154,123,47,.04); }
+
+.tk {
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 500; color: var(--gold);
+  font-size: 13px; letter-spacing: 1px;
+}
+.co { color: var(--ink); font-weight: 300; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.mo { font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+.num { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--slate); text-align: right; }
+
+.gb {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px;
+  font-family: 'Playfair Display', serif;
+  font-size: 16px; font-weight: 700;
+}
+.gA { background: rgba(45,122,79,.12); color: #2d7a4f; border: 1px solid rgba(45,122,79,.3); }
+.gB { background: rgba(154,123,47,.12); color: #9a7b2f; border: 1px solid rgba(154,123,47,.3); }
+.gC { background: rgba(154,107,15,.1);  color: #9a6b0f; border: 1px solid rgba(154,107,15,.25); }
+.gD { background: rgba(184,92,56,.1);   color: #b85c38; border: 1px solid rgba(184,92,56,.25); }
+.gF { background: rgba(184,50,50,.12);  color: #b83232; border: 1px solid rgba(184,50,50,.35); }
+.cc { text-align: center; }
+
+.verd {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px; letter-spacing: 1px;
+  text-transform: uppercase; padding: 3px 8px;
+}
+.vBuy  { color: var(--green); border: 1px solid rgba(45,122,79,.3);  background: rgba(45,122,79,.07);  }
+.vHold { color: var(--amber); border: 1px solid rgba(154,107,15,.3); background: rgba(154,107,15,.07); }
+.vSell { color: var(--red);   border: 1px solid rgba(184,50,50,.3);  background: rgba(184,50,50,.07);  }
+
+.err-row td { color: var(--red); font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+.load-row td { color: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-style: italic; }
+
+/* ── FOOTNOTE ─────────────────────────────────────────────────────────────── */
+.fn {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; color: var(--muted);
+  margin-top: 16px; padding: 12px 0;
+  border-top: 1px solid var(--line);
+  line-height: 1.9;
+}
+
+/* ── GRADING KEY ──────────────────────────────────────────────────────────── */
+.grade-key {
+  display: flex; gap: 20px; flex-wrap: wrap;
+  margin: 20px 0; padding: 16px 20px;
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--gold);
+}
+.grade-key-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--muted);
+  width: 100%; margin-bottom: 4px;
+}
+.gk-item {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--slate);
+}
+
+/* ── DISCLAIMER ───────────────────────────────────────────────────────────── */
+.disc {
+  margin-top: 40px; padding: 16px 20px;
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--ink);
+  background: var(--cream);
+}
+.disc p {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9.5px; color: var(--muted); line-height: 1.8;
+}
+.disc strong { color: var(--ink); }
+
+/* ── KEY STORAGE NOTE ─────────────────────────────────────────────────────── */
+.key-note {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; color: var(--muted);
+  padding: 10px 14px; margin-bottom: 20px;
+  background: var(--cream);
+  border-left: 2px solid var(--gold);
+  line-height: 1.7;
+}
 </style>
 </head>
 <body>
 
-<h2>Finnhub Live Price Test</h2>
+<!-- MASTHEAD -->
+<div class="masthead">
+  <div class="masthead-rule">Proprietary Research · Not for Distribution</div>
+  <h1>Equity Analyst</h1>
+  <div class="masthead-sub">Multi-Strategy Valuation · DCF · AI-Augmented Fundamentals</div>
+</div>
 
-<label>Your Finnhub API Key</label>
-<input id="apiKey" type="text" placeholder="Paste your key here" autocorrect="off" autocapitalize="none" spellcheck="false"/>
+<div class="page">
 
-<label>Ticker Symbol</label>
-<input id="ticker" type="text" placeholder="AAPL" value="AAPL" autocorrect="off" autocapitalize="characters" spellcheck="false"/>
+  <!-- API KEYS -->
+  <hr class="divider"><span class="divider-label" style="position:relative;top:0;left:0;transform:none;display:block;text-align:center;margin-bottom:16px;">API Configuration</span>
 
-<button id="btn" onclick="testFetch()">Fetch Live Price</button>
+  <div class="key-note">
+    Keys are stored in your browser session only and never transmitted anywhere except directly to their respective APIs.
+  </div>
 
-<div id="result"></div>
+  <div class="keys-grid">
+    <div class="field">
+      <div class="field-label">Finnhub API Key — Live Prices</div>
+      <input class="field-input" id="finnhubKey" type="password"
+        placeholder="Paste Finnhub key here"
+        autocorrect="off" autocapitalize="none" spellcheck="false"/>
+    </div>
+    <div class="field">
+      <div class="field-label">Anthropic API Key — DCF Fundamentals</div>
+      <input class="field-input" id="anthropicKey" type="password"
+        placeholder="Paste Anthropic key here (sk-ant-...)"
+        autocorrect="off" autocapitalize="none" spellcheck="false"/>
+    </div>
+  </div>
+
+  <!-- TICKERS -->
+  <hr class="divider"><span class="divider-label" style="position:relative;top:0;left:0;transform:none;display:block;text-align:center;margin-bottom:16px;">Symbols</span>
+
+  <div class="ticker-section">
+    <div class="field-label" style="margin-bottom:8px">Ticker Symbols</div>
+    <input class="ticker-input" id="tickerInput" type="text"
+      placeholder="AAPL, MSFT, GOOGL, TSLA, NVDA, U, CRWV ..."
+      autocorrect="off" autocapitalize="characters" spellcheck="false"/>
+    <div class="field-hint">Separate with commas or spaces · Up to 20+ symbols · Press Enter to run</div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-run" id="runBtn" onclick="runAnalysis()">Run Analysis</button>
+    <button class="btn btn-pdf" id="pdfBtn" onclick="exportPDF()" disabled>Export PDF Report</button>
+  </div>
+
+  <!-- STRATEGIES -->
+  <div class="strat-bar">
+    <span class="strat-label">Strategies:</span>
+    <span class="stag on">DCF Valuation</span>
+    <span class="stag">+ More Coming</span>
+  </div>
+
+  <!-- GRADE KEY -->
+  <div class="grade-key">
+    <div class="grade-key-title">Grading Scale — Margin of Safety</div>
+    <div class="gk-item"><div class="gb gA">A</div> &gt;30% undervalued</div>
+    <div class="gk-item"><div class="gb gB">B</div> 10–30% undervalued</div>
+    <div class="gk-item"><div class="gb gC">C</div> ±10% fair value</div>
+    <div class="gk-item"><div class="gb gD">D</div> 10–30% overvalued</div>
+    <div class="gk-item"><div class="gb gF">F</div> &gt;30% overvalued</div>
+  </div>
+
+  <!-- STATUS + PROGRESS -->
+  <div class="status-bar" id="statusBar"></div>
+  <div class="prog"><div class="prog-fill" id="progFill"></div></div>
+
+  <!-- RESULTS -->
+  <div class="results" id="results">
+    <div class="results-hdr">
+      <div class="results-title">Analysis Results</div>
+      <div class="results-meta" id="resMeta"></div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Ticker</th>
+            <th>Company</th>
+            <th>Live Price</th>
+            <th>DCF Value</th>
+            <th>Margin of Safety</th>
+            <th>WACC</th>
+            <th>FCF Yield</th>
+            <th class="c">DCF</th>
+            <th class="c">Composite</th>
+            <th>Verdict</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="fn" id="fn"></div>
+  </div>
+
+  <!-- DISCLAIMER -->
+  <div class="disc">
+    <p><strong>DISCLAIMER —</strong> This tool is for informational and educational purposes only. It does not constitute financial advice, investment recommendations, or an offer to buy or sell any security. Live prices sourced from Finnhub. DCF inputs are AI-estimated by Claude and involve significant assumptions that may not reflect actual financials. Past performance is not indicative of future results. Always consult a qualified financial advisor before making investment decisions.</p>
+  </div>
+
+</div><!-- /page -->
 
 <script>
-async function testFetch() {
-  const key    = document.getElementById('apiKey').value.trim();
-  const ticker = document.getElementById('ticker').value.trim().toUpperCase();
-  const result = document.getElementById('result');
-  const btn    = document.getElementById('btn');
-
-  if (!key)    { show('err', 'Please enter your Finnhub API key.'); return; }
-  if (!ticker) { show('err', 'Please enter a ticker symbol.'); return; }
-
-  btn.disabled = true;
-
-  const url = 'https://finnhub.io/api/v1/quote?symbol=' + ticker + '&token=' + key;
-
-  const lines = [];
-  function log(msg, type) {
-    lines.push({ msg, type });
-    result.className = 'show';
-    result.innerHTML = lines.map(l =>
-      '<div class="' + (l.type||'dim') + '">' + l.msg + '</div>'
-    ).join('');
-  }
-
-  log('Step 1: Button clicked ✓');
-  log('Step 2: Key length = ' + key.length + ', Ticker = ' + ticker);
-  log('Step 3: URL = ' + url.replace(key, key.substring(0,4)+'****'));
-  log('Step 4: Calling fetch()...');
-
-  try {
-    let res;
-    try {
-      res = await fetch(url);
-      log('Step 5: fetch() returned, HTTP status = ' + res.status, res.ok ? 'ok' : 'err');
-    } catch(fetchErr) {
-      log('Step 5: fetch() threw an exception!', 'err');
-      log('Error name: ' + fetchErr.name, 'err');
-      log('Error message: ' + fetchErr.message, 'err');
-      log('---', 'dim');
-      log('Diagnosis: Network request was blocked or failed before reaching the server.', 'err');
-      log('Possible causes:', 'dim');
-      log('  • File opened from Files app (file:// protocol) — try moving to iCloud and opening via Safari share sheet', 'dim');
-      log('  • iOS content blocker or VPN blocking the request', 'dim');
-      log('  • No internet connection', 'dim');
-      log('  • Safari cross-origin policy blocking file:// → https://', 'dim');
-      return;
-    }
-
-    let text;
-    try {
-      text = await res.text();
-      log('Step 6: Response body received, length = ' + text.length + ' chars', 'ok');
-      log('Raw response: ' + text.substring(0, 200), 'dim');
-    } catch(textErr) {
-      log('Step 6: Failed to read response body: ' + textErr.message, 'err');
-      return;
-    }
-
-    let data;
-    try {
-      data = JSON.parse(text);
-      log('Step 7: JSON parsed OK', 'ok');
-    } catch(jsonErr) {
-      log('Step 7: JSON parse failed: ' + jsonErr.message, 'err');
-      log('Raw text was: ' + text.substring(0, 300), 'dim');
-      return;
-    }
-
-    if (data.error) {
-      log('Step 8: API returned error: ' + data.error, 'err');
-      return;
-    }
-
-    if (data.c === 0 && data.t === 0) {
-      log('Step 8: API returned zeros — invalid ticker or key', 'err');
-      log('Full response: ' + JSON.stringify(data), 'dim');
-      return;
-    }
-
-    // Success
-    const pct   = data.dp != null ? (data.dp >= 0 ? '+' : '') + data.dp.toFixed(2) + '%' : '—';
-    const color = data.d >= 0 ? '#4caf7d' : '#e05c5c';
-    const ts    = data.t ? new Date(data.t * 1000).toLocaleTimeString() : '—';
-
-    result.innerHTML =
-      '<div class="ok">✓ SUCCESS — Live data received!</div>' +
-      '<div class="price">$' + data.c.toFixed(2) + '</div>' +
-      '<div><span class="dim">Change: </span><span style="color:' + color + '">' +
-        (data.d >= 0 ? '+' : '') + data.d.toFixed(2) + ' (' + pct + ')</span></div>' +
-      '<div><span class="dim">Open: </span>$' + data.o.toFixed(2) +
-        '&nbsp;&nbsp;<span class="dim">High: </span>$' + data.h.toFixed(2) +
-        '&nbsp;&nbsp;<span class="dim">Low: </span>$' + data.l.toFixed(2) + '</div>' +
-      '<div><span class="dim">Prev Close: </span>$' + data.pc.toFixed(2) + '</div>' +
-      '<div><span class="dim">Timestamp: </span>' + ts + '</div>' +
-      '<div style="margin-top:14px;color:#4caf7d;font-size:11px;border-top:1px solid #2a2a35;padding-top:10px;">' +
-        '✓ CONCEPT VALIDATED — Outbound fetch works. Ready to build the full app.</div>';
-    result.className = 'show';
-
-  } finally {
-    btn.disabled = false;
-  }
+// ── FINNHUB: LIVE PRICE ───────────────────────────────────────────────────────
+async function fetchLivePrice(ticker, finnhubKey) {
+  const url = 'https://finnhub.io/api/v1/quote?symbol=' + ticker + '&token=' + finnhubKey;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Finnhub HTTP ' + res.status);
+  const d = await res.json();
+  if (!d || (d.c === 0 && d.t === 0)) throw new Error('No price data — check ticker or Finnhub key');
+  return d.c; // current price
 }
 
-function show(type, msg) {
-  const result = document.getElementById('result');
-  result.className = 'show';
-  result.innerHTML = '<span class="' + type + '">' + msg.replace(/\n/g, '<br>') + '</span>';
+// ── CLAUDE API: DCF FUNDAMENTALS ──────────────────────────────────────────────
+async function fetchFundamentals(ticker, anthropicKey) {
+  const prompt =
+    'You are a financial analyst. For the stock ticker ' + ticker + ', return ONLY a JSON object with these fields based on the most recent available financial data you know. No explanation, no markdown fences, raw JSON only:\n\n' +
+    '{\n' +
+    '  "companyName": "Full legal company name",\n' +
+    '  "avgFCF": <average annual free cash flow USD last 3 years as integer>,\n' +
+    '  "revenueGrowthRate": <3yr avg annual revenue growth as decimal e.g. 0.12>,\n' +
+    '  "beta": <beta coefficient as decimal>,\n' +
+    '  "totalDebt": <total long-term debt USD as integer>,\n' +
+    '  "cash": <cash and equivalents USD as integer>,\n' +
+    '  "sharesOutstanding": <shares outstanding as integer>,\n' +
+    '  "marketCap": <market cap USD as integer>,\n' +
+    '  "notes": "One sentence: key risk or main assumption"\n' +
+    '}\n\n' +
+    'If ticker is unknown return: {"error":"Unknown ticker ' + ticker + '"}';
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 600,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error('Claude API: ' + (err.error?.message || 'HTTP ' + res.status));
+  }
+
+  const data = await res.json();
+  const text = data.content.map(b => b.text || '').join('').trim()
+    .replace(/^```json\s*/i,'').replace(/^```/,'').replace(/```\s*$/,'').trim();
+
+  const parsed = JSON.parse(text);
+  if (parsed.error) throw new Error(parsed.error);
+  return parsed;
 }
 
-document.addEventListener('keydown', e => {
-  if (e.key === 'Enter') testFetch();
+// ── DCF ENGINE ────────────────────────────────────────────────────────────────
+function runDCF(fundamentals, livePrice) {
+  const { avgFCF, revenueGrowthRate, beta, totalDebt,
+          cash, sharesOutstanding, marketCap } = fundamentals;
+
+  if (!avgFCF)          return { error: 'Missing FCF data' };
+  if (!sharesOutstanding) return { error: 'Missing shares data' };
+
+  const price = livePrice;
+  const mc    = marketCap || (price * sharesOutstanding);
+
+  // WACC via CAPM
+  const rfr   = 0.044;
+  const mrp   = 0.055;
+  const coe   = rfr + (beta || 1.0) * mrp;
+  const debt  = Math.abs(totalDebt || 0);
+  const totC  = mc + debt;
+  const eW    = totC > 0 ? mc / totC : 0.85;
+  const wacc  = Math.max(eW * coe + (1 - eW) * 0.055 * 0.79, 0.06);
+
+  // Growth
+  const rg     = Math.min(Math.max(revenueGrowthRate || 0.04, -0.05), 0.25);
+  const growth = rg * 0.55 + 0.025;
+  const termG  = 0.025;
+  if (wacc <= termG) return { error: 'WACC ≤ terminal growth rate' };
+
+  // 5-year FCF projection
+  let pv = 0, proj = avgFCF;
+  for (let yr = 1; yr <= 5; yr++) {
+    proj *= (1 + growth);
+    pv   += proj / Math.pow(1 + wacc, yr);
+  }
+
+  // Terminal value (perpetuity growth)
+  const tv    = proj * (1 + termG) / (wacc - termG);
+  const pvTV  = tv / Math.pow(1 + wacc, 5);
+  const total = pv + pvTV;
+
+  // Equity value per share
+  const netDebt   = debt - Math.abs(cash || 0);
+  const equity    = total - netDebt;
+  const intrinsic = equity / sharesOutstanding;
+
+  if (!isFinite(intrinsic) || intrinsic <= 0) return { error: 'Negative/invalid equity value' };
+
+  const mos      = (intrinsic - price) / intrinsic;
+  const fcfYield = mc > 0 ? avgFCF / mc : null;
+  const grade    = mos > 0.30 ? 'A' : mos > 0.10 ? 'B' : mos > -0.10 ? 'C' : mos > -0.30 ? 'D' : 'F';
+
+  return { intrinsic, mos, wacc, fcfYield, grade, price };
+}
+
+// ── COMPOSITE + VERDICT ───────────────────────────────────────────────────────
+function compositeGrade(grades) {
+  const map = { A:4, B:3, C:2, D:1, F:0 };
+  const rev = ['F','D','C','B','A'];
+  const valid = grades.filter(g => g && map[g] !== undefined);
+  if (!valid.length) return '—';
+  return rev[Math.round(valid.reduce((s,g) => s + map[g], 0) / valid.length)];
+}
+function verdictFor(g) {
+  if (g === 'A' || g === 'B') return { label: 'BUY',  cls: 'vBuy'  };
+  if (g === 'C')              return { label: 'HOLD', cls: 'vHold' };
+  return                             { label: 'SELL', cls: 'vSell' };
+}
+
+// ── FORMAT HELPERS ────────────────────────────────────────────────────────────
+function fmtUSD(n) { return (n != null && isFinite(n)) ? '$' + n.toFixed(2) : '—'; }
+function fmtPct(n) {
+  if (n == null || !isFinite(n)) return '—';
+  return (n >= 0 ? '+' : '') + (n * 100).toFixed(1) + '%';
+}
+function gradeHtml(g) {
+  if (!g || g === '—') return '<span style="color:var(--muted)">—</span>';
+  return '<div style="display:flex;justify-content:center"><div class="gb g' + g + '">' + g + '</div></div>';
+}
+
+// ── RENDER ROW ────────────────────────────────────────────────────────────────
+function renderRow(tbody, r) {
+  const row = tbody.insertRow();
+  if (r.error && !r.dcf) {
+    row.className = 'err-row';
+    row.innerHTML = '<td class="tk">' + r.ticker + '</td><td colspan="9">' + r.error + '</td>';
+    return;
+  }
+  const dcf  = r.dcf || {};
+  const comp = r.composite || '—';
+  const mos  = dcf.mos;
+  const mosColor = mos == null ? '' : mos > 0 ? 'color:var(--green)' : 'color:var(--red)';
+  const verd = comp !== '—' ? verdictFor(comp) : null;
+  const verdHtml = verd
+    ? '<span class="verd ' + verd.cls + '">' + verd.label + '</span>'
+    : '<span style="color:var(--muted);font-family:IBM Plex Mono,monospace;font-size:10px">—</span>';
+  const errNote = dcf.error
+    ? ' <span style="color:var(--red);font-size:10px">(' + dcf.error + ')</span>' : '';
+
+  row.innerHTML =
+    '<td class="tk">' + r.ticker + '</td>' +
+    '<td class="co">' + (r.companyName || '—').substring(0, 24) + errNote + '</td>' +
+    '<td class="mo">' + fmtUSD(r.livePrice) + '</td>' +
+    '<td class="num">' + fmtUSD(dcf.intrinsic) + '</td>' +
+    '<td class="num" style="' + mosColor + '">' + fmtPct(mos) + '</td>' +
+    '<td class="num">' + (dcf.wacc != null ? (dcf.wacc * 100).toFixed(1) + '%' : '—') + '</td>' +
+    '<td class="num">' + (dcf.fcfYield != null ? (dcf.fcfYield * 100).toFixed(1) + '%' : '—') + '</td>' +
+    '<td class="cc">' + gradeHtml(dcf.grade) + '</td>' +
+    '<td class="cc">' + gradeHtml(comp) + '</td>' +
+    '<td>' + verdHtml + '</td>';
+}
+
+// ── MAIN LOOP ─────────────────────────────────────────────────────────────────
+let allResults = [];
+
+async function runAnalysis() {
+  const finnhubKey   = document.getElementById('finnhubKey').value.trim();
+  const anthropicKey = document.getElementById('anthropicKey').value.trim();
+
+  if (!finnhubKey)   { setStatus('Please enter your Finnhub API key.'); return; }
+  if (!anthropicKey) { setStatus('Please enter your Anthropic API key.'); return; }
+
+  const raw = document.getElementById('tickerInput').value;
+  const seen = {}, tickers = [];
+  raw.toUpperCase().split(/[\s,]+/).forEach(t => {
+    t = t.trim();
+    if (t && !seen[t]) { tickers.push(t); seen[t] = true; }
+  });
+  if (!tickers.length) { setStatus('Enter at least one ticker symbol.'); return; }
+
+  const runBtn = document.getElementById('runBtn');
+  const pdfBtn = document.getElementById('pdfBtn');
+  runBtn.disabled = true; pdfBtn.disabled = true;
+  allResults = [];
+
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+  document.getElementById('results').classList.add('on');
+  document.getElementById('resMeta').textContent = '';
+  document.getElementById('fn').textContent = '';
+  document.getElementById('progFill').style.width = '0%';
+
+  for (let i = 0; i < tickers.length; i++) {
+    const ticker = tickers[i];
+    setStatus('Analyzing ' + ticker + ' (' + (i + 1) + '/' + tickers.length + ')…', true);
+    document.getElementById('progFill').style.width = (i / tickers.length * 100) + '%';
+
+    const loadRow = tbody.insertRow();
+    loadRow.className = 'load-row';
+    loadRow.innerHTML = '<td class="tk">' + ticker + '</td><td colspan="9">Fetching live price + AI fundamentals…</td>';
+
+    const result = { ticker };
+    try {
+      // Run Finnhub + Claude in parallel
+      const [livePrice, fundamentals] = await Promise.all([
+        fetchLivePrice(ticker, finnhubKey),
+        fetchFundamentals(ticker, anthropicKey)
+      ]);
+
+      result.livePrice   = livePrice;
+      result.companyName = fundamentals.companyName;
+      result.notes       = fundamentals.notes;
+      result.dcf         = runDCF(fundamentals, livePrice);
+      result.composite   = compositeGrade([result.dcf?.grade]);
+
+    } catch(e) {
+      result.error     = e.message;
+      result.dcf       = { error: e.message };
+      result.composite = '—';
+    }
+
+    allResults.push(result);
+    tbody.removeChild(loadRow);
+    renderRow(tbody, result);
+
+    if (i < tickers.length - 1) await new Promise(r => setTimeout(r, 300));
+  }
+
+  document.getElementById('progFill').style.width = '100%';
+  setTimeout(() => { document.getElementById('progFill').style.width = '0%'; }, 800);
+
+  const ok = allResults.filter(r => r.dcf?.grade).length;
+  const ts = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+  document.getElementById('resMeta').textContent = ok + '/' + tickers.length + ' analyzed · ' + ts;
+  document.getElementById('fn').textContent =
+    'Live prices: Finnhub. DCF inputs: Claude AI estimates (training cutoff early 2025). ' +
+    'Model: 5yr FCF projection, CAPM WACC (floor 6%), perpetuity terminal value (g=2.5%), risk-free rate 4.4%. ' +
+    'Results are estimates only and do not constitute investment advice.';
+
+  setStatus('Complete. ' + ok + ' of ' + tickers.length + ' symbols analyzed.');
+  runBtn.disabled = false;
+  if (ok > 0) pdfBtn.disabled = false;
+}
+
+// ── STATUS ────────────────────────────────────────────────────────────────────
+function setStatus(msg, loading) {
+  document.getElementById('statusBar').innerHTML = loading
+    ? '<div class="dot"></div><span>' + msg + '</span>'
+    : '<span style="color:var(--muted)">' + msg + '</span>';
+}
+
+// ── PDF EXPORT ────────────────────────────────────────────────────────────────
+async function exportPDF() {
+  if (!window.jspdf) {
+    setStatus('Loading PDF library…', true);
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('Failed to load jsPDF'));
+      document.head.appendChild(s);
+    });
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const m = 16, cW = W - m * 2;
+
+  // Background
+  doc.setFillColor(245, 242, 235); doc.rect(0, 0, W, H, 'F');
+
+  // Header rules
+  doc.setDrawColor(26, 26, 36); doc.setLineWidth(0.8);
+  doc.line(m, 8, W - m, 8);
+  doc.line(m, 9.5, W - m, 9.5);
+
+  // Title
+  doc.setFont('times', 'bold'); doc.setFontSize(22);
+  doc.setTextColor(26, 26, 36); doc.text('EQUITY ANALYST', W / 2, 20, { align: 'center' });
+  doc.setFont('times', 'italic'); doc.setFontSize(9);
+  doc.setTextColor(154, 123, 47);
+  doc.text('Multi-Strategy Valuation Report — AI-Augmented Fundamentals', W / 2, 26, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+  doc.setTextColor(138, 135, 153);
+  doc.text('Generated: ' + new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' }), W - m, 26, { align: 'right' });
+
+  doc.setDrawColor(26, 26, 36); doc.setLineWidth(0.4);
+  doc.line(m, 30, W - m, 30);
+
+  // Table headers
+  const cols = ['TICKER', 'COMPANY', 'LIVE PRICE', 'DCF VALUE', 'MOS', 'WACC', 'FCF YIELD', 'DCF', 'COMPOSITE', 'VERDICT'];
+  const cw   = [16, 46, 18, 20, 22, 16, 20, 18, 20, 18];
+  const rH   = 9;
+  let y = 36;
+
+  doc.setFillColor(237, 233, 223); doc.rect(m, y, cW, rH, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5);
+  doc.setTextColor(138, 135, 153);
+  let x = m + 2;
+  cols.forEach((h, i) => { doc.text(h, x, y + 6); x += cw[i]; });
+  y += rH;
+
+  const gc = g => ({ A: [45,122,79], B: [154,123,47], C: [154,107,15], D: [184,92,56], F: [184,50,50] }[g] || [138,135,153]);
+  const vc = g => (g === 'A' || g === 'B') ? [45,122,79] : g === 'C' ? [154,107,15] : [184,50,50];
+
+  allResults.filter(r => r.dcf?.grade).forEach((r, idx) => {
+    if (idx % 2 === 0) { doc.setFillColor(250, 248, 244); doc.rect(m, y, cW, rH, 'F'); }
+    const dcf = r.dcf;
+    const mos = dcf.mos;
+    const mosStr = mos != null ? (mos >= 0 ? '+' : '') + (mos * 100).toFixed(1) + '%' : '—';
+    const cells = [
+      { t: r.ticker, c: [154,123,47], b: true },
+      { t: (r.companyName || '—').substring(0, 24), c: [26,26,36] },
+      { t: fmtUSD(r.livePrice), c: [26,26,36] },
+      { t: fmtUSD(dcf.intrinsic), c: [26,26,36] },
+      { t: mosStr, c: mos != null && mos > 0 ? [45,122,79] : [184,50,50] },
+      { t: dcf.wacc != null ? (dcf.wacc * 100).toFixed(1) + '%' : '—', c: [74,74,90] },
+      { t: dcf.fcfYield != null ? (dcf.fcfYield * 100).toFixed(1) + '%' : '—', c: [74,74,90] },
+      { t: dcf.grade || '—', c: gc(dcf.grade), b: true },
+      { t: r.composite || '—', c: gc(r.composite), b: true },
+      { t: r.composite && r.composite !== '—' ? verdictFor(r.composite).label : '—', c: vc(r.composite) },
+    ];
+    x = m + 2;
+    cells.forEach((cell, i) => {
+      doc.setFont('helvetica', cell.b ? 'bold' : 'normal');
+      doc.setFontSize(7.5); doc.setTextColor(...cell.c);
+      doc.text(cell.t, x, y + 6); x += cw[i];
+    });
+    y += rH;
+  });
+
+  // Footer rules
+  doc.setDrawColor(26,26,36); doc.setLineWidth(0.4);
+  doc.line(m, y + 2, W - m, y + 2);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(6); doc.setTextColor(138,135,153);
+  doc.text(
+    'Live prices: Finnhub. DCF inputs: Claude AI estimates (cutoff early 2025). CAPM WACC (floor 6%), perpetuity TV (g=2.5%), Rf=4.4%. Not investment advice.',
+    m, y + 8, { maxWidth: cW }
+  );
+  doc.setDrawColor(26,26,36); doc.setLineWidth(0.8);
+  doc.line(m, H - 8, W - m, H - 8);
+  doc.line(m, H - 9.5, W - m, H - 9.5);
+
+  doc.save('equity-analysis-' + new Date().toISOString().slice(0, 10) + '.pdf');
+  setStatus('PDF exported.');
+}
+
+// ── ENTER KEY ─────────────────────────────────────────────────────────────────
+document.getElementById('tickerInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') runAnalysis();
 });
 </script>
 </body>
