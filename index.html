@@ -405,7 +405,12 @@ async function callClaudeWebSearch(prompt, key, maxTokens=1400){
   const content=d.choices?.[0]?.message?.content||'';
   const text=typeof content==='string'?content:
     (Array.isArray(content)?content.filter(b=>b.type==='text').map(b=>b.text).join(''):'');
-  return text.trim().replace(/^```json\s*/i,'').replace(/^```/,'').replace(/```\s*$/,'').trim();
+  // Extract the JSON object regardless of surrounding prose or markdown
+  const trimmed=text.trim();
+  const start=trimmed.indexOf('{');
+  const end=trimmed.lastIndexOf('}');
+  if(start===-1||end===-1) throw new Error('No JSON object found in response: '+trimmed.slice(0,120));
+  return trimmed.slice(start,end+1);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
