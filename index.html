@@ -349,28 +349,29 @@ function computeTA(metrics, currentPrice){
 // ══════════════════════════════════════════════════════════════════════════════
 // DCF ENGINE (computed locally)
 // ══════════════════════════════════════════════════════════════════════════════
-function normaliseToActual(val){
-  // Claude sometimes returns FCF/debt/shares in billions (5.2) or millions (5200)
-  // rather than actual dollars. Detect by magnitude — real FCF/debt > $1M always,
-  // real share counts > 1M always. Anything suspiciously small gets scaled up.
-  if(!val || !isFinite(val)) return val;
-  const abs = Math.abs(val);
-  if(abs < 1000)   return val * 1e9; // e.g. 5.2 → $5.2B (billions notation)
-  if(abs < 1e6)    return val * 1e6; // e.g. 5200 → $5.2B (millions notation)
-  return val;                         // already actual dollars
-}
-function runDCF(f,livePrice){
-  const cur=(f.reportingCurrency||'USD').toUpperCase();
-  // Finnhub marketCapitalization is in millions USD — convert to actual dollars
-  const mcFinnhub = (f.marketCap||0) * 1e6;
-  const mcActual = toUSD(mcFinnhub > 0 ? mcFinnhub : (livePrice * normaliseToActual(f.sharesOutstanding)), cur);
-  const avgFCF = normaliseToActual(toUSD(f.avgFCF, cur));
-  const debt   = Math.abs(normaliseToActual(toUSD(f.totalDebt||0, cur)));
-  const cash   = Math.abs(normaliseToActual(toUSD(f.cash||0, cur)));
-  const shares = normaliseToActual(f.sharesOutstanding);
-  const mc     = mcActual || (livePrice * shares);
-  if(!avgFCF) return{error:'No FCF data'};
-  if(!shares)  return{error:'No shares data'};
+function runDCF(f, livePrice, fhMetricRaw){
+  const cur = (f.reportingCurrency||'USD').toUpperCase();
+
+  // fcfPerShare is per-share in reporting currency — unambiguous, same scale as stock price
+  const fcfPerShare = toUSD(f.fcfPerShare, cur);
+  if(!fcfPerShare || !isFinite(fcfPerShare) || fcfPerShare === 0)
+    return{error:'No FCF per share data'};
+
+  // Shares: derived from Finnhub marketCapitalization (millions) + live price — no AI guessing
+  const fhMC = (fhMetricRaw?.metric?.marketCapitalization || 0) * 1e6; // Finnhub is in millions
+  const shares = fhMC > 0 ? fhMC / livePrice : null;
+  if(!shares || !isFinite(shares) || shares < 1e6)
+    return{error:'Cannot derive share count from Finnhub market cap'};
+
+  // Total FCF = fcfPerShare * shares — both terms are now unambiguous
+  const avgFCF = fcfPerShare * shares;
+
+  // Debt/cash: Claude returns in billions explicitly — multiply by 1e9
+  const debt = Math.abs(toUSD((f.totalDebtBillions||0) * 1e9, cur));
+  const cash = Math.abs(toUSD((f.cashBillions||0)     * 1e9, cur));
+  const mc   = fhMC > 0 ? toUSD(fhMC, cur) : livePrice * shares;
+
+  if(!isFinite(avgFCF) || avgFCF === 0) return{error:'Computed FCF is zero'};
   const coe=0.044+(f.beta||1.0)*0.055;
   const totC=mc+debt, eW=totC>0?mc/totC:0.85;
   const wacc=Math.max(eW*coe+(1-eW)*0.055*0.79,0.06);
@@ -450,14 +451,12 @@ Return JSON for ${ticker}:
 {
   "companyName": "Full legal name",
   "reportingCurrency": "ISO 4217 e.g. USD TWD CAD",
-  "avgFCF": <avg annual FCF last 3yrs as ACTUAL DOLLAR AMOUNT (not millions) in reporting currency e.g. 5000000000 for $5B>,
-  "revenueGrowthRate": <3yr avg annual revenue growth decimal>,
-  "beta": <use Finnhub value if available, else search>,
-  "totalDebt": <long-term debt as ACTUAL DOLLAR AMOUNT (not millions) in reporting currency>,
-  "cash": <cash & equivalents as ACTUAL DOLLAR AMOUNT (not millions) in reporting currency>,
-  "sharesOutstanding": <shares as ACTUAL INTEGER e.g. 1400000000 for 1.4 billion shares, NOT in millions>,
-  "marketCap": <market cap as ACTUAL DOLLAR AMOUNT (not millions) in reporting currency>,
-  "dcfNotes": "Key DCF assumption or risk",
+  "fcfPerShare": <free cash flow PER SHARE in reporting currency — same unit as stock price e.g. AAPL ~6.94, MSFT ~12.50>,
+  "revenueGrowthRate": <3yr avg annual revenue growth as decimal e.g. 0.08 for 8%>,
+  "beta": <use Finnhub value if available, else estimate>,
+  "totalDebtBillions": <total long-term debt in BILLIONS of reporting currency e.g. 108.0 for $108B>,
+  "cashBillions": <cash and equivalents in BILLIONS of reporting currency e.g. 48.3 for $48.3B>,
+  "dcfNotes": "Key DCF assumption or risk in one sentence",
   "peRatio": <P/E — use Finnhub if available>,
   "sectorAvgPE": <sector avg P/E — search for current>,
   "peAssessment": "cheap|fair|expensive",
@@ -477,7 +476,8 @@ Return JSON for ${ticker}:
   "entryZoneHigh": <USD>,
   "stopLoss": <USD>,
   "gsGrade": "A|B|C|D|F"
-}`;
+}
+Do not include any fields not listed above. Return raw JSON only.`;
 
   const text=await callClaudeWebSearch(prompt,key,1600);
   const p=JSON.parse(text);
@@ -845,7 +845,7 @@ async function _runAnalysis(){
       result.call2=call2;
 
       // DCF computed from AI-provided fundamentals (AI fills FCF/shares/debt not in Finnhub free tier)
-      result.dcf=runDCF(call1,result.livePrice);
+      result.dcf=runDCF(call1,result.livePrice,fhData.metrics);
 
       // Composite from all 4 strategy grades
       result.composite=compositeGrade([result.dcf?.grade, call1.gsGrade, call2.taGrade, call2.rentechGrade]);
