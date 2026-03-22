@@ -352,41 +352,58 @@ function computeTA(metrics, currentPrice){
 function runDCF(f, livePrice, fhMetricRaw){
   const cur = (f.reportingCurrency||'USD').toUpperCase();
 
-  // fcfPerShare is per-share in reporting currency — unambiguous, same scale as stock price
+  // fcfPerShare: per-share, same unit/scale as stock price — unambiguous
   const fcfPerShare = toUSD(f.fcfPerShare, cur);
-  if(!fcfPerShare || !isFinite(fcfPerShare) || fcfPerShare === 0)
-    return{error:'No FCF per share data'};
+  if(fcfPerShare == null || !isFinite(fcfPerShare))
+    return{grade:null, error:'No FCF per share provided'};
 
-  // Shares: derived from Finnhub marketCapitalization (millions) + live price — no AI guessing
-  const fhMC = (fhMetricRaw?.metric?.marketCapitalization || 0) * 1e6; // Finnhub is in millions
+  // Shares derived from Finnhub market cap (millions) ÷ live price — no AI input needed
+  const fhMC = (fhMetricRaw?.metric?.marketCapitalization || 0) * 1e6;
   const shares = fhMC > 0 ? fhMC / livePrice : null;
-  if(!shares || !isFinite(shares) || shares < 1e6)
-    return{error:'Cannot derive share count from Finnhub market cap'};
+  if(!shares || !isFinite(shares) || shares < 1e4)
+    return{grade:null, error:'Cannot derive shares from Finnhub market cap'};
 
-  // Total FCF = fcfPerShare * shares — both terms are now unambiguous
   const avgFCF = fcfPerShare * shares;
+  const debt   = Math.abs(toUSD((f.totalDebtBillions||0) * 1e9, cur));
+  const cash   = Math.abs(toUSD((f.cashBillions||0)      * 1e9, cur));
+  const mc     = fhMC > 0 ? toUSD(fhMC, cur) : livePrice * shares;
 
-  // Debt/cash: Claude returns in billions explicitly — multiply by 1e9
-  const debt = Math.abs(toUSD((f.totalDebtBillions||0) * 1e9, cur));
-  const cash = Math.abs(toUSD((f.cashBillions||0)     * 1e9, cur));
-  const mc   = fhMC > 0 ? toUSD(fhMC, cur) : livePrice * shares;
+  // Negative FCF is a real, valid financial state — grade F immediately, no projection needed
+  if(fcfPerShare <= 0){
+    const wacc = Math.max(0.044+(f.beta||1.0)*0.055, 0.06);
+    return{
+      grade:'F', intrinsic:null, mos:null,
+      wacc, fcfYield: mc>0 ? avgFCF/mc : null,
+      note:'FCF negative — company not yet profitable on cash basis'
+    };
+  }
 
-  if(!isFinite(avgFCF) || avgFCF === 0) return{error:'Computed FCF is zero'};
-  const coe=0.044+(f.beta||1.0)*0.055;
-  const totC=mc+debt, eW=totC>0?mc/totC:0.85;
-  const wacc=Math.max(eW*coe+(1-eW)*0.055*0.79,0.06);
-  const rg=Math.min(Math.max(f.revenueGrowthRate||0.04,-0.05),0.25);
-  const growth=rg*0.55+0.025, termG=0.025;
-  if(wacc<=termG) return{error:'WACC ≤ terminal growth'};
-  let pv=0,proj=avgFCF;
-  for(let yr=1;yr<=5;yr++){proj*=(1+growth);pv+=proj/Math.pow(1+wacc,yr);}
-  const tv=proj*(1+termG)/(wacc-termG);
-  const equity=(pv+tv/Math.pow(1+wacc,5))-(debt-cash);
-  const intrinsic=equity/shares;
-  if(!isFinite(intrinsic)||intrinsic<=0) return{error:'Negative equity value — check FCF or currency'};
-  const mos=(intrinsic-livePrice)/intrinsic;
-  const grade=mos>0.30?'A':mos>0.10?'B':mos>-0.10?'C':mos>-0.30?'D':'F';
-  return{intrinsic,mos,wacc,fcfYield:mc>0?avgFCF/mc:null,grade};
+  const coe  = 0.044 + (f.beta||1.0) * 0.055;
+  const totC = mc + debt;
+  const eW   = totC > 0 ? mc / totC : 0.85;
+  const wacc = Math.max(eW*coe + (1-eW)*0.055*0.79, 0.06);
+  const rg   = Math.min(Math.max(f.revenueGrowthRate||0.04, -0.05), 0.25);
+  const growth = rg*0.55 + 0.025, termG = 0.025;
+  if(wacc <= termG) return{grade:'F', error:'WACC ≤ terminal growth rate'};
+
+  let pv=0, proj=avgFCF;
+  for(let yr=1;yr<=5;yr++){ proj*=(1+growth); pv+=proj/Math.pow(1+wacc,yr); }
+  const tv     = proj*(1+termG)/(wacc-termG);
+  const equity = (pv + tv/Math.pow(1+wacc,5)) - (debt-cash);
+
+  // Negative equity after projection = debt exceeds PV of cash flows — valid F
+  if(!isFinite(equity) || equity <= 0){
+    return{
+      grade:'F', intrinsic:null, mos:null,
+      wacc, fcfYield: mc>0 ? avgFCF/mc : null,
+      note:'Debt-adjusted equity negative — highly leveraged relative to FCF'
+    };
+  }
+
+  const intrinsic = equity / shares;
+  const mos = (intrinsic - livePrice) / intrinsic;
+  const grade = mos>0.30?'A': mos>0.10?'B': mos>-0.10?'C': mos>-0.30?'D': 'F';
+  return{intrinsic, mos, wacc, fcfYield: mc>0?avgFCF/mc:null, grade};
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -638,7 +655,7 @@ function renderCard(container,r){
       '<div class="metric"><div class="mlabel">FCF Yield</div><div class="mval">'+(dcf.fcfYield?fmtPctPlain(dcf.fcfYield):'—')+'</div></div>'+
       '<div class="metric"><div class="mlabel">Currency</div><div class="mval">'+currency+'</div></div>'+
     '</div>'+
-    (dcf.error?'<div style="font-family:IBM Plex Mono,monospace;font-size:10px;color:var(--red);margin-top:5px">⚠ '+dcf.error+'</div>':'')+
+    ((dcf.error||dcf.note)?'<div style="font-family:IBM Plex Mono,monospace;font-size:10px;color:'+(dcf.error?'var(--red)':'var(--amber)')+';margin-top:5px">'+(dcf.error?'⚠ ':'ℹ ')+( dcf.error||dcf.note)+'</div>':'')+
   '</div>'+
 
   // ② GS SCREENER
@@ -1007,9 +1024,11 @@ async function exportPDF(){
       ['FCF Yield',     dcf.fcfYield?fmtPctPlain(dcf.fcfYield):'—'],
       ['Currency',      currency],
     ],y);
-    if(dcf.error){
-      doc.setFont('helvetica','italic');doc.setFontSize(6);doc.setTextColor(184,50,50);
-      doc.text('Note: '+dcf.error,m+4,y+4);y+=6;
+    if(dcf.error||dcf.note){
+      const isErr=!!dcf.error;
+      doc.setFont('helvetica','italic');doc.setFontSize(6);
+      doc.setTextColor(...(isErr?[184,50,50]:[154,107,15]));
+      doc.text((isErr?'Error: ':'Note: ')+(dcf.error||dcf.note),m+4,y+4);y+=6;
     }
     y+=2;
 
